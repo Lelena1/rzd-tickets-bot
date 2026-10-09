@@ -1,0 +1,16 @@
+# Normalize all text files to LF in the repository, regardless of the
+# developer's OS line-ending settings (avoids the LF/CRLF warnings on Windows).
+* text=auto eol=lf
+
+*.py text
+*.md text
+*.txt text
+*.cfg text
+*.ini text
+*.json text
+*.yml text
+*.yaml text
+
+*.png binary
+*.jpg binary
+*.jpeg binary
