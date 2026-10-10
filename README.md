@@ -111,6 +111,18 @@ copy .env.example .env   # fill in a bot token from @BotFather
 python -m bot.main
 ```
 
+### Auto-start on Windows login
+
+[`start_bot.bat`](start_bot.bat) wraps the run command with logging to
+`bot_autostart.log`. To have it start automatically, drop a shortcut to
+it into your Startup folder (`Win+R` → `shell:startup`) — this uses
+Explorer's normal startup-shell mechanism. (A Task Scheduler "run at
+logon" entry is the more common approach and usually works fine; on one
+development machine it silently failed to spawn the process at all —
+Task Scheduler reported success but the Windows Task Scheduler
+operational log showed no process-creation event — so the Startup
+folder was used instead as a more reliable fallback.)
+
 ## Known limitations
 
 - **Not instant.** Each search is a real page load / API round-trip
