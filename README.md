@@ -1,5 +1,7 @@
 # 🚆 RZD Tickets Bot
 
+**English** | [Русский](README.ru.md)
+
 A Telegram bot that searches Russian Railways (RZD) train tickets and
 watches a specific train/car class for you, notifying you the moment
 seats open up — including a dedicated filter for pet-friendly seats.
