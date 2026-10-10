@@ -1,100 +1,128 @@
-# Telegram-бот поиска билетов РЖД
+# 🚆 RZD Tickets Bot
 
-Ищет поезда между станциями на дату через сайт `ticket.rzd.ru` и умеет
-отслеживать появление свободных мест на конкретном поезде, присылая
-уведомление, когда их количество увеличивается.
+A Telegram bot that searches Russian Railways (RZD) train tickets and
+watches a specific train/car class for you, notifying you the moment
+seats open up — including a dedicated filter for pet-friendly seats.
 
-## Как это устроено
+**Stack:** Python · [aiogram 3](https://docs.aiogram.dev/) · Playwright ·
+SQLite · APScheduler
 
-РЖД защищает `ticket.rzd.ru` антибот-сервисом **BotFaqtor**: обычные
-HTTP-запросы (через `httpx`/`requests`) получают `200 OK` с пустым телом.
-Поэтому бот обращается к сайту через настоящий headless-браузер
-(**Playwright** + Chromium) — так сайт отдаёт данные, как любому обычному
-посетителю.
+## What it does
 
-- Подсказки городов: `GET https://ticket.rzd.ru/api/v1/suggests` (вызывается
-  через `fetch()` внутри страницы браузера, а не отдельным HTTP-клиентом —
-  это важно, см. ниже).
-- Результаты поиска: `GET https://ticket.rzd.ru/searchresults/v/1/{from}/{to}/{дата}`
-  — это SPA, данные рендерятся в браузере; бот ждёт появления карточек
-  поездов (`.tst-searchTransport-railway-cardListItem`) и парсит их из DOM.
+- **`/search`** — pick a departure city, destination, and date through a
+  step-by-step dialog with live autocomplete; get back every train on
+  that route with seat counts, prices, and upper/lower berth breakdown
+  per car class.
+- **Seat tracking** — tap a car class under any train to watch it. The
+  bot polls RZD in the background and messages you the moment the seat
+  count goes up (e.g. a cancellation frees up a berth on a sold-out
+  train). Tracking works per class — just "Купе", just "Плацкарт" — not
+  only "any seat on this train."
+- **🐾 Pet-friendly seats** — RZD marks certain car-class allocations as
+  reserved for passengers travelling with small pets. The bot surfaces
+  these as their own trackable option, separate from the regular
+  allocation of the same class.
+- **`/mytracking`** — see and cancel active watches.
+- **Direct buy link** — every search result links straight to the
+  matching page on `ticket.rzd.ru` so you finish the actual purchase on
+  RZD's own site (the bot only searches and tracks; it never handles
+  payment or passenger data).
+- **Access control** — an optional allowlist of Telegram user IDs, so a
+  bot you run for your own family isn't open to the whole internet.
 
-Официальной документации на эти эндпоинты у РЖД нет — сайт может
-измениться в любой момент, тогда понадобится обновить селекторы в
-[bot/rzd_api.py](bot/rzd_api.py).
+## The interesting part: getting data out of ticket.rzd.ru
 
-**Важный нюанс:** подсказки станций получаются через `fetch()` изнутри
-страницы браузера, а не через `context.request.get()` (отдельный
-HTTP-клиент Playwright) — на одной из тестовых машин `context.request`
-не мог резолвить DNS для `ticket.rzd.ru`, а обычная навигация страницы
-резолвила его нормально (эти два пути используют разный сетевой стек).
-Если снова столкнётесь с `ENOTFOUND`/DNS-ошибками — проверьте, не через
-`context.request` ли идёт запрос.
+RZD doesn't publish a public API, and the site is actively defended
+against scraping — which made this less of a "call a REST endpoint"
+project and more of a small reverse-engineering exercise:
 
-## Возможности
+1. **Plain HTTP clients get silently blocked.** `httpx`/`requests`
+   requests to `ticket.rzd.ru` return `200 OK` with an *empty body* —
+   no error, just nothing. The cause turned out to be
+   [BotFaqtor](https://botfaqtor.ru/), a commercial anti-bot service
+   loaded on the page (`cdn.botfaqtor.ru/one.js`) that fingerprints the
+   client and quietly drops requests that don't look like a real
+   browser.
+2. **A real (headless) browser gets through.** Driving actual Chromium
+   via Playwright — even headless — passes BotFaqtor's checks, because
+   it *is* a real browser engine. All requests are made through
+   `fetch()` executed **inside** a page already on `ticket.rzd.ru`,
+   rather than Playwright's separate `APIRequestContext` — the two use
+   different network stacks, and `APIRequestContext` turned out to be
+   unreliable (DNS resolution failures) on at least one test machine
+   where in-page `fetch()` worked fine.
+3. **Finding the real data source.** The first working version scraped
+   the rendered search-results page's DOM. Watching the Network tab
+   during a manual search turned up the actual backend endpoint the
+   page itself calls —
+   `/api/v1/railway-service/prices/train-pricing` — a single JSON
+   response with far more detail than the UI shows (per-class upper/
+   lower berth counts, a `HasPlacesNearPets` flag per car group, exact
+   pricing). Switching to it cut a search from ~15–20s of
+   DOM-rendering wait down to a couple of seconds, and made car-class
+   tracking (including the pet-seat filter) possible at all — none of
+   that granularity survives into the rendered page.
+4. **Certificates.** `ticket.rzd.ru`'s certificate chains to a Russian
+   government CA that isn't in most default trust stores, so every
+   HTTP client in this project runs with certificate verification
+   explicitly relaxed for that one host.
 
-- `/search` — пошаговый поиск: город отправления → город прибытия → дата.
-- Под каждым найденным поездом — кнопка «Отслеживать появление мест».
-- `/mytracking` — список активных отслеживаний с кнопкой остановки.
-- Фоновая проверка (APScheduler) каждые `POLL_INTERVAL_MINUTES` минут —
-  при увеличении числа свободных мест бот пишет пользователю.
+None of this is documented anywhere — the integration in
+[`bot/rzd_api.py`](bot/rzd_api.py) is built entirely from observed
+network traffic, and will need updating if RZD changes the site.
 
-## Установка
+## Project structure
+
+```
+bot/
+  rzd_api.py       — Playwright client for ticket.rzd.ru (stations, train search)
+  db.py            — SQLite storage for active watches
+  scheduler.py     — background job that re-checks watched trains
+  middlewares.py   — Telegram user allowlist
+  formatting.py    — train/seat message formatting
+  keyboards.py     — inline keyboards (class picker, buy link, stop watch)
+  states.py        — aiogram FSM states for /search
+  utils.py         — date parsing/formatting
+  config.py        — environment variables
+  handlers/
+    common.py      — /start, /help, /cancel
+    search.py       — the /search dialog
+    tracking.py     — watch setup, /mytracking
+  main.py          — entry point (starts the browser, bot, and scheduler)
+```
+
+## Setup
 
 ```bash
-cd train_ticket_bot
+git clone https://github.com/Lelena1/rzd-tickets-bot
+cd rzd-tickets-bot
 python -m venv .venv
 .venv\Scripts\activate   # Windows
 pip install -r requirements.txt
 python -m playwright install chromium
-copy .env.example .env   # и вписать туда токен бота от @BotFather
+copy .env.example .env   # fill in a bot token from @BotFather
 ```
 
-## Запуск
+## Run
 
 ```bash
 python -m bot.main
 ```
 
-## Важные ограничения
+## Known limitations
 
-- **Скорость:** каждый поиск — это полноценная загрузка страницы в
-  браузере (10–20 секунд), а не мгновенный API-запрос. Это нормально для
-  личного использования, но не подходит для частого опроса много
-  пользователей одновременно.
-- **Хрупкость к изменениям сайта:** все селекторы (`bot/rzd_api.py`)
-  привязаны к конкретной вёрстке `ticket.rzd.ru` на момент разработки.
-  РЖД может в любой момент поменять разметку — тогда поиск перестанет
-  работать, пока не обновить селекторы.
-- **BotFaqtor всё равно может заблокировать и браузер** — headless-режим
-  не даёт стопроцентной гарантии, антибот-сервисы постоянно развиваются.
-  Если бот вдруг перестанет находить поезда без видимой причины — это
-  первое, что стоит проверить.
-- Хранилище FSM — `MemoryStorage` (в памяти процесса). После перезапуска
-  бота диалоги `/search` в процессе обрываются, но уже добавленные
-  отслеживания (они в SQLite) переживают перезапуск.
-- Отслеживание уведомляет при **увеличении** числа мест относительно
-  последней проверки (в т.ч. с 0 до N) — а не при любом ненулевом
-  количестве, чтобы не слать повторные сообщения о том же самом.
-- Один поезд — одно отслеживание по сумме мест всех классов вагонов.
-  Отслеживание по конкретному классу (только «Купе», например) не
-  реализовано.
-
-## Структура проекта
-
-```
-bot/
-  config.py       — переменные окружения
-  rzd_api.py       — Playwright-клиент к ticket.rzd.ru (станции, поиск поездов)
-  db.py            — SQLite: хранение отслеживаний
-  formatting.py    — форматирование сообщений о поездах
-  keyboards.py     — инлайн-клавиатуры
-  states.py        — состояния FSM для /search
-  utils.py         — разбор и форматирование дат
-  scheduler.py      — фоновая проверка отслеживаний
-  handlers/
-    common.py      — /start, /help, /cancel
-    search.py       — диалог /search
-    tracking.py     — постановка на отслеживание, /mytracking
-  main.py          — точка входа (запускает браузер + бота)
-```
+- **Not instant.** Each search is a real page load / API round-trip
+  through a browser (a couple of seconds), not a cached lookup — fine
+  for personal use, not built for high request volume.
+- **Coupled to RZD's current site.** Field names and the one CSS
+  selector still in use are snapshots of `ticket.rzd.ru` as it is
+  today; a site redesign will require updating `bot/rzd_api.py`.
+- **No bypass guarantee.** Headless-but-real-browser traffic passes
+  BotFaqtor's checks today, but anti-bot services evolve; this isn't a
+  permanent workaround.
+- FSM state lives in memory (aiogram's `MemoryStorage`) — an in-progress
+  `/search` dialog doesn't survive a restart, but saved watches (SQLite)
+  do.
+- A watch fires on an *increase* in seat count since the last check
+  (including 0 → N), not on every poll where seats exist — so it
+  doesn't repeat the same notification every 5 minutes.
