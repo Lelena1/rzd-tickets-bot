@@ -206,6 +206,12 @@ def _aggregate_car_groups(raw_groups: list[dict]) -> list[CarGroup]:
     обычными."""
     merged: dict[tuple[str, bool], CarGroup] = {}
     for raw in raw_groups:
+        if raw.get("CarType") == "Baggage":
+            # Багажный вагон — это место для крупного багажа, а не
+            # пассажирское место; билет на него не продаётся как обычно
+            # (цены у него и нет), поэтому в поиске и отслеживании он
+            # только путает.
+            continue
         name = _car_group_name(raw)
         has_pets = bool(raw.get("HasPlacesNearPets"))
         key = (name, has_pets)
