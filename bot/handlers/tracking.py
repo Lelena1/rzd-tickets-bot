@@ -240,14 +240,27 @@ async def my_tracking(message: Message) -> None:
 
 
 @router.callback_query(F.data.startswith("untrack:"))
-async def untrack(callback: CallbackQuery) -> None:
+async def untrack(callback: CallbackQuery, state: FSMContext) -> None:
     item_id = int(callback.data.split(":", 1)[1])
+    item = await db.get_tracked(item_id)
     ok = await db.deactivate(item_id, chat_id=callback.message.chat.id)
-    if ok:
-        await callback.answer("Остановлено")
-        base_text = callback.message.html_text or ""
-        await callback.message.edit_text(
-            base_text + "\n\n🛑 Отслеживание остановлено.", parse_mode="HTML"
-        )
-    else:
+    if not ok:
         await callback.answer("Не найдено", show_alert=True)
+        return
+
+    await callback.answer("Остановлено")
+    base_text = callback.message.html_text or ""
+    new_text = base_text + "\n\n🛑 Отслеживание остановлено."
+
+    # Если это сообщение было карточкой поезда из того же /search (данные
+    # ещё в памяти) — возвращаем кнопки выбора класса, а не оставляем
+    # сообщение совсем без кнопок.
+    markup = None
+    if item:
+        data = await state.get_data()
+        cars = data.get("trains", {}).get(item.train_number, {}).get("cars")
+        if cars:
+            car_rows = [(c["type_name"], c["free_seats"]) for c in cars]
+            markup = build_track_keyboard(item.train_number, car_rows)
+
+    await callback.message.edit_text(new_text, parse_mode="HTML", reply_markup=markup)

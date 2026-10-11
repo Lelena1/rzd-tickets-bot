@@ -111,6 +111,14 @@ async def add_tracked(
         return cursor.lastrowid
 
 
+async def get_tracked(item_id: int) -> TrackedItem | None:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute("SELECT * FROM tracked WHERE id = ?", (item_id,))
+        row = await cursor.fetchone()
+        return TrackedItem(**dict(row)) if row else None
+
+
 async def list_tracked_for_chat(chat_id: int) -> list[TrackedItem]:
     async with aiosqlite.connect(DB_PATH) as conn:
         conn.row_factory = aiosqlite.Row
