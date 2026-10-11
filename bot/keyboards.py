@@ -13,37 +13,85 @@ def stations_keyboard(stations: list[Station], prefix: str) -> InlineKeyboardMar
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-def track_keyboard(train: Train) -> InlineKeyboardMarkup:
-    """Кнопка отслеживания под каждым классом вагона + «любой класс» (сумма)."""
+# Стандартные классы вагонов РЖД для кнопочного выбора в «Другой класс» —
+# чтобы пользователю почти никогда не приходилось печатать текст руками
+# (а значит, и уходить в конец чата набирать сообщение).
+STANDARD_CLASSES = [
+    "Сидячий",
+    "Плацкартный",
+    "Купе",
+    "СВ",
+    "Люкс",
+    "Базовый",
+    "Эконом",
+    "Эконом+",
+    "Комфорт",
+    "Бизнес класс",
+    "Первый класс",
+    "Семейный",
+    "Вагон-бистро",
+]
+
+
+def build_track_keyboard(train_number: str, car_rows: list[tuple[str, int]]) -> InlineKeyboardMarkup:
+    """Кнопка отслеживания под каждым классом вагона + «любой класс» (сумма).
+
+    car_rows — список (название класса, свободных мест), в т.ч. из уже
+    сохранённых данных поиска (для кнопки «Назад»), а не только из свежего
+    ответа API.
+    """
     rows = []
-    for i, car in enumerate(train.cars):
-        label = car.type_name.strip()
+    for i, (name, seats) in enumerate(car_rows):
         rows.append(
             [
                 InlineKeyboardButton(
-                    text=f"🔔 {label} ({car.free_seats})",
-                    callback_data=f"track:{train.number}:{i}",
+                    text=f"🔔 {name} ({seats})",
+                    callback_data=f"track:{train_number}:{i}",
                 )
             ]
         )
-    if len(train.cars) > 1:
+    if len(car_rows) > 1:
+        total = sum(seats for _, seats in car_rows)
         rows.append(
             [
                 InlineKeyboardButton(
-                    text=f"🔔 Любой класс (всего {train.total_free_seats})",
-                    callback_data=f"track:{train.number}:all",
+                    text=f"🔔 Любой класс (всего {total})",
+                    callback_data=f"track:{train_number}:all",
                 )
             ]
         )
     rows.append(
-        [
-            InlineKeyboardButton(
-                text="✏️ Другой класс (которого нет в списке)",
-                callback_data=f"trackcustom:{train.number}",
-            )
-        ]
+        [InlineKeyboardButton(text="✏️ Другой класс", callback_data=f"trackpicker:{train_number}")]
     )
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def track_keyboard(train: Train) -> InlineKeyboardMarkup:
+    return build_track_keyboard(train.number, [(c.type_name, c.free_seats) for c in train.cars])
+
+
+def class_picker_keyboard(train_number: str) -> InlineKeyboardMarkup:
+    """Список стандартных классов вагона — шаг 1 выбора «Другого класса»."""
+    rows = [
+        [InlineKeyboardButton(text=name, callback_data=f"trackclasspick:{train_number}:{i}")]
+        for i, name in enumerate(STANDARD_CLASSES)
+    ]
+    rows.append(
+        [InlineKeyboardButton(text="✏️ Своё название (редкий класс)", callback_data=f"trackcustom:{train_number}")]
+    )
+    rows.append([InlineKeyboardButton(text="◀ Назад", callback_data=f"trackback:{train_number}")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def pet_choice_keyboard(train_number: str, class_idx: int) -> InlineKeyboardMarkup:
+    """Обычные места или места с питомцем — шаг 2 выбора «Другого класса»."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Обычные места", callback_data=f"trackfinal:{train_number}:{class_idx}:0")],
+            [InlineKeyboardButton(text="🐾 Места с питомцем", callback_data=f"trackfinal:{train_number}:{class_idx}:1")],
+            [InlineKeyboardButton(text="◀ Назад", callback_data=f"trackpicker:{train_number}")],
+        ]
+    )
 
 
 def buy_link_keyboard(code_from: str, code_to: str, date_iso: str) -> InlineKeyboardMarkup:

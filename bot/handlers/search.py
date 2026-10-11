@@ -115,7 +115,7 @@ async def got_date(message: Message, state: FSMContext, browser_ctx: BrowserCont
     pet_trains = sum(1 for t in trains if t.has_any_pet_places)
     header = f"Найдено поездов: {len(trains)} ({name_from} → {name_to}, {date_display})"
     if pet_trains:
-        header += f"\n🐾 С местами для животных: {pet_trains}"
+        header += f"\n🐾 С местами с питомцем: {pet_trains}"
     if len(trains) > MAX_TRAINS_SHOWN:
         header += f"\nПоказываю первые {MAX_TRAINS_SHOWN} — уточните дату/время, если нужного поезда нет в списке."
     await message.answer(header, reply_markup=buy_link_keyboard(code_from, code_to, date_iso))
