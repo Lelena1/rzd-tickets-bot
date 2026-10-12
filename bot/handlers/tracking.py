@@ -239,7 +239,9 @@ async def my_tracking(message: Message) -> None:
         )
         await message.answer(
             text,
-            reply_markup=tracked_item_keyboard(item.id, item.code_from, item.code_to, item.date),
+            reply_markup=tracked_item_keyboard(
+                item.id, item.code_from, item.code_to, item.date, item.train_number
+            ),
         )
 
 

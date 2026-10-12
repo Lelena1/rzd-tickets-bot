@@ -94,12 +94,21 @@ def pet_choice_keyboard(train_number: str, class_idx: int) -> InlineKeyboardMark
     )
 
 
-def buy_link_keyboard(code_from: str, code_to: str, date_iso: str) -> InlineKeyboardMarkup:
+def _buy_button_text(train_number: str | None) -> str:
+    # RZD не даёт прямых ссылок на конкретный поезд (его выбор не кодируется
+    # в URL, только в состоянии браузера) — страница результатов содержит
+    # все поезда сразу, поэтому номер нужного добавляем в текст кнопки.
+    if train_number:
+        return f"🛒 Купить (ищите поезд {train_number})"
+    return "🛒 Открыть на ticket.rzd.ru для покупки"
+
+
+def buy_link_keyboard(code_from: str, code_to: str, date_iso: str, train_number: str | None = None) -> InlineKeyboardMarkup:
     """Ссылка на страницу результатов на самом ticket.rzd.ru — для
     реальной покупки билета (бот сам билеты не покупает, см. README)."""
     url = f"https://ticket.rzd.ru/searchresults/v/1/{code_from}/{code_to}/{date_iso}?adult=1"
     return InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text="🛒 Открыть на ticket.rzd.ru для покупки", url=url)]]
+        inline_keyboard=[[InlineKeyboardButton(text=_buy_button_text(train_number), url=url)]]
     )
 
 
@@ -111,12 +120,14 @@ def stop_tracking_button(item_id: int) -> InlineKeyboardMarkup:
     )
 
 
-def tracked_item_keyboard(item_id: int, code_from: str, code_to: str, date_iso: str) -> InlineKeyboardMarkup:
+def tracked_item_keyboard(
+    item_id: int, code_from: str, code_to: str, date_iso: str, train_number: str | None = None
+) -> InlineKeyboardMarkup:
     """Для /mytracking — ссылка на покупку вместе с кнопкой остановки."""
     url = f"https://ticket.rzd.ru/searchresults/v/1/{code_from}/{code_to}/{date_iso}?adult=1"
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🛒 Открыть на ticket.rzd.ru для покупки", url=url)],
+            [InlineKeyboardButton(text=_buy_button_text(train_number), url=url)],
             [InlineKeyboardButton(text="🛑 Остановить", callback_data=f"untrack:{item_id}")],
         ]
     )

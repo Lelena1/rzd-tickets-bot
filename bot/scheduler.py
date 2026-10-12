@@ -63,7 +63,7 @@ async def check_all_tracked(bot: Bot, browser_ctx: BrowserContext) -> None:
                         f"({item.name_from} → {item.name_to}, {display_date}), класс: {class_label}\n"
                         f"Свободно сейчас: {current_seats} (было {item.last_seats})"
                     ),
-                    reply_markup=buy_link_keyboard(item.code_from, item.code_to, item.date),
+                    reply_markup=buy_link_keyboard(item.code_from, item.code_to, item.date, item.train_number),
                 )
             except Exception:  # noqa: BLE001 - не даём упасть всему циклу из-за одного чата
                 logger.exception("Не удалось отправить уведомление chat_id=%s", item.chat_id)
