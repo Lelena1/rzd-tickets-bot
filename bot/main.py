@@ -3,6 +3,7 @@ import logging
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
+from aiogram.types import BotCommand
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from bot import db
@@ -20,6 +21,16 @@ async def main() -> None:
     await db.init_db()
 
     bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=None))
+    await bot.set_my_commands(
+        [
+            BotCommand(command="start", description="Начать / о боте"),
+            BotCommand(command="search", description="Найти поезда между городами"),
+            BotCommand(command="mytracking", description="Мои отслеживания"),
+            BotCommand(command="clear", description="Очистить историю последнего поиска"),
+            BotCommand(command="cancel", description="Отменить текущий диалог"),
+            BotCommand(command="help", description="Помощь и список команд"),
+        ]
+    )
     dp = Dispatcher()
     dp.message.outer_middleware(AccessControlMiddleware())
     dp.callback_query.outer_middleware(AccessControlMiddleware())
