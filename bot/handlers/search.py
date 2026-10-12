@@ -112,14 +112,38 @@ async def got_date(message: Message, state: FSMContext, browser_ctx: BrowserCont
         },
     )
 
+    await _delete_previous_results(message, data)
+
+    shown = trains[:MAX_TRAINS_SHOWN]
+    route_line = f"{name_from} → {name_to}, {date_display}"
+
     pet_trains = sum(1 for t in trains if t.has_any_pet_places)
-    header = f"Найдено поездов: {len(trains)} ({name_from} → {name_to}, {date_display})"
+    header = f"Найдено поездов: {len(trains)} ({route_line})"
     if pet_trains:
         header += f"\n🐾 С местами с питомцем: {pet_trains}"
     if len(trains) > MAX_TRAINS_SHOWN:
         header += f"\nПоказываю первые {MAX_TRAINS_SHOWN} — уточните дату/время, если нужного поезда нет в списке."
-    await message.answer(header, reply_markup=buy_link_keyboard(code_from, code_to, date_iso))
-    for train in trains[:MAX_TRAINS_SHOWN]:
-        await message.answer(format_train(train), parse_mode="HTML", reply_markup=track_keyboard(train))
 
+    sent_ids = []
+    header_msg = await message.answer(header, reply_markup=buy_link_keyboard(code_from, code_to, date_iso))
+    sent_ids.append(header_msg.message_id)
+
+    for i, train in enumerate(shown, start=1):
+        position = f"<b>№{i} из {len(shown)}</b> · {route_line}\n\n"
+        train_msg = await message.answer(
+            position + format_train(train), parse_mode="HTML", reply_markup=track_keyboard(train)
+        )
+        sent_ids.append(train_msg.message_id)
+
+    await state.update_data(search_message_ids=sent_ids)
     await state.set_state(None)
+
+
+async def _delete_previous_results(message: Message, data: dict) -> None:
+    """Убирает карточки предыдущего поиска, чтобы в чате не накапливались
+    результаты из разных дат/маршрутов вперемешку."""
+    for msg_id in data.get("search_message_ids") or []:
+        try:
+            await message.bot.delete_message(message.chat.id, msg_id)
+        except Exception:  # noqa: BLE001 - сообщение могли удалить вручную и т.п.
+            pass
