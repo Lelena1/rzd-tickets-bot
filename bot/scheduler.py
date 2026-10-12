@@ -7,6 +7,7 @@ from aiogram import Bot
 from playwright.async_api import BrowserContext
 
 from bot import db
+from bot.keyboards import buy_link_keyboard
 from bot.rzd_api import RzdApiError, search_trains
 
 logger = logging.getLogger(__name__)
@@ -62,6 +63,7 @@ async def check_all_tracked(bot: Bot, browser_ctx: BrowserContext) -> None:
                         f"({item.name_from} → {item.name_to}, {display_date}), класс: {class_label}\n"
                         f"Свободно сейчас: {current_seats} (было {item.last_seats})"
                     ),
+                    reply_markup=buy_link_keyboard(item.code_from, item.code_to, item.date),
                 )
             except Exception:  # noqa: BLE001 - не даём упасть всему циклу из-за одного чата
                 logger.exception("Не удалось отправить уведомление chat_id=%s", item.chat_id)
