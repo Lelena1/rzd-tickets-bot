@@ -111,17 +111,26 @@ copy .env.example .env   # fill in a bot token from @BotFather
 python -m bot.main
 ```
 
-### Auto-start on Windows login
+### Starting it on Windows
 
 [`start_bot.bat`](start_bot.bat) wraps the run command with logging to
-`bot_autostart.log`. To have it start automatically, drop a shortcut to
-it into your Startup folder (`Win+R` → `shell:startup`) — this uses
-Explorer's normal startup-shell mechanism. (A Task Scheduler "run at
-logon" entry is the more common approach and usually works fine; on one
-development machine it silently failed to spawn the process at all —
-Task Scheduler reported success but the Windows Task Scheduler
-operational log showed no process-creation event — so the Startup
-folder was used instead as a more reliable fallback.)
+`bot_autostart.log` and a few retries in case Chromium briefly isn't
+ready. A desktop shortcut to it is the simplest way to start the bot
+with one click.
+
+True unattended auto-start turned out to be unreliable on at least one
+development machine: both a Task Scheduler "run at logon" entry and a
+Startup-folder shortcut consistently failed to launch the bundled
+Chromium (`BrowserType.launch: Executable doesn't exist`), while the
+exact same command run from an interactive shell, a plain double-click,
+or even `Start-Process` from PowerShell always worked. Windows Defender
+wasn't the cause (disabled on that machine); clearing `LOCALAPPDATA`
+didn't reproduce it either — something specific to how the Task
+Scheduler service and Explorer's startup-shell processing create child
+processes seems to matter here, and it wasn't worth chasing further
+for a convenience feature. If you get it working reliably via Task
+Scheduler or Startup folder on your machine, the one-click shortcut is
+obviously nicer — just verify it a few times before relying on it.
 
 ## Known limitations
 
