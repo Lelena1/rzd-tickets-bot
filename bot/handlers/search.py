@@ -41,10 +41,18 @@ async def chosen_from(callback: CallbackQuery, state: FSMContext) -> None:
     data = await state.get_data()
     name = data.get("from_candidates", {}).get(code, code)
     await state.update_data(code_from=code, express_from=express, name_from=name)
-    await state.set_state(SearchStates.waiting_to)
     await callback.message.edit_text(f"Отправление: {name}")
-    await callback.message.answer("Куда едем? Введите название города/станции.")
     await callback.answer()
+
+    if "code_to" in data:
+        # Город прибытия уже задан (например, через кнопку «Куда») — сразу спрашиваем дату.
+        await state.set_state(SearchStates.waiting_date)
+        await callback.message.answer(
+            "На какую дату искать? Формат дд.мм.гггг, либо 'сегодня' / 'завтра'."
+        )
+    else:
+        await state.set_state(SearchStates.waiting_to)
+        await callback.message.answer("Куда едем? Введите название города/станции.")
 
 
 @router.message(SearchStates.waiting_to)
@@ -64,12 +72,18 @@ async def chosen_to(callback: CallbackQuery, state: FSMContext) -> None:
     data = await state.get_data()
     name = data.get("to_candidates", {}).get(code, code)
     await state.update_data(code_to=code, express_to=express, name_to=name)
-    await state.set_state(SearchStates.waiting_date)
     await callback.message.edit_text(f"Прибытие: {name}")
-    await callback.message.answer(
-        "На какую дату искать? Формат дд.мм.гггг, либо 'сегодня' / 'завтра'."
-    )
     await callback.answer()
+
+    if "code_from" in data:
+        # Город отправления уже задан (например, через кнопку «Откуда») — сразу спрашиваем дату.
+        await state.set_state(SearchStates.waiting_date)
+        await callback.message.answer(
+            "На какую дату искать? Формат дд.мм.гггг, либо 'сегодня' / 'завтра'."
+        )
+    else:
+        await state.set_state(SearchStates.waiting_from)
+        await callback.message.answer("Из какого города/станции едем? Введите название.")
 
 
 @router.message(SearchStates.waiting_date)

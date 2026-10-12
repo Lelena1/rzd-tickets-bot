@@ -1,8 +1,20 @@
 from __future__ import annotations
 
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
 
 from bot.rzd_api import Station, Train
+
+BTN_FROM = "📍 Откуда"
+BTN_TO = "🏁 Куда"
+BTN_CLEAR = "🗑 Очистить историю"
+
+
+def main_menu_keyboard() -> ReplyKeyboardMarkup:
+    """Постоянная клавиатура внизу экрана — вместо команд /search по шагам."""
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text=BTN_FROM), KeyboardButton(text=BTN_TO)], [KeyboardButton(text=BTN_CLEAR)]],
+        resize_keyboard=True,
+    )
 
 
 def stations_keyboard(stations: list[Station], prefix: str) -> InlineKeyboardMarkup:
