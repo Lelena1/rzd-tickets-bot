@@ -109,3 +109,14 @@ def stop_tracking_button(item_id: int) -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="🛑 Остановить", callback_data=f"untrack:{item_id}")]
         ]
     )
+
+
+def tracked_item_keyboard(item_id: int, code_from: str, code_to: str, date_iso: str) -> InlineKeyboardMarkup:
+    """Для /mytracking — ссылка на покупку вместе с кнопкой остановки."""
+    url = f"https://ticket.rzd.ru/searchresults/v/1/{code_from}/{code_to}/{date_iso}?adult=1"
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="🛒 Открыть на ticket.rzd.ru для покупки", url=url)],
+            [InlineKeyboardButton(text="🛑 Остановить", callback_data=f"untrack:{item_id}")],
+        ]
+    )

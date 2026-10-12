@@ -13,6 +13,7 @@ from bot.keyboards import (
     class_picker_keyboard,
     pet_choice_keyboard,
     stop_tracking_button,
+    tracked_item_keyboard,
 )
 from bot.states import TrackStates
 from bot.utils import display_date
@@ -236,7 +237,10 @@ async def my_tracking(message: Message) -> None:
             f"{item.name_from} → {item.name_to}, {display_date(item.date)}\n"
             f"Последнее известное число мест: {item.last_seats}"
         )
-        await message.answer(text, reply_markup=stop_tracking_button(item.id))
+        await message.answer(
+            text,
+            reply_markup=tracked_item_keyboard(item.id, item.code_from, item.code_to, item.date),
+        )
 
 
 @router.callback_query(F.data.startswith("untrack:"))
